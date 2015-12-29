@@ -5,9 +5,9 @@
  *  Created on: Dec 15, 2015
  *  Author: Johan Wermensjö
  */
- 
+
 // Definitions.
-#define AUTO_ON
+//#define AUTO_ON
 
 // Ports.
 #define POWER_CTRL_INPUT_PIN (uint8_t) 1 // Analog pin number (digital pin 2)
@@ -17,9 +17,12 @@
 #define POWER_BUTTON_INPUT_PIN (uint8_t) 3
 
 // Timings.
-#define POWER_BUTTON_TIMEOUT (uint16_t) 3000
-#define POWER_BUTTON_DELAY (uint16_t) 50
-#define POWER_BUTTON_LED_BLINK_DELAY 500
+#define POWER_BUTTON_HOLD_TIME (uint16_t) 3000
+#define POWER_BUTTON_DELAY (uint16_t) 100
+#define POWER_BUTTON_LED_BLINK_DELAY (uint16_t) 500
+#define POWER_BUTTON_LED_FAST_BLINK_DELAY (uint16_t) 250
+#define POWER_CTRL_READY_HOLD_TIME (uint16_t) 2000
+#define POWER_CTRL_READY_POST_TIME (uint16_t) 8000
 
 // Output states.
 #define POWER_STATE_ON HIGH
@@ -32,7 +35,7 @@
 // Input states.
 #define POWER_BUTTON_UP LOW
 #define POWER_BUTTON_DOWN HIGH
-#define POWER_CTRL_READY_THRESHOLD (uint16_t) 512 // Corresponds to 2.5V
+#define POWER_CTRL_READY_THRESHOLD (uint16_t) 256 // Corresponds to 1.25V
 
 // Functions.
 static void waitForButtonState(uint8_t state);
@@ -58,7 +61,7 @@ void setup() {
 	#endif
 	
 	// Initialize no shutdown alert.
-	digitalWrite(POWER_MC_OUTPUT_PIN, POWER_ALERT_OFF);
+	digitalWrite(POWER_CTRL_OUTPUT_PIN, POWER_ALERT_OFF);
 }
 
 void loop() {
@@ -77,14 +80,22 @@ void loop() {
 		digitalWrite(POWER_CTRL_OUTPUT_PIN, POWER_ALERT_ON);
 	
 		// Initiate button timeout.
-		uint16_t timeout = POWER_BUTTON_DELAY;
-		uint16_t ledToggleTime = POWER_BUTTON_DELAY;
+		uint16_t powerButtonnHeldTime = 0;
+		uint16_t ledToggleTime = 0;
+		uint16_t ctrlReadyTime = 0;
 		bool ledState = true;
+		bool ctrlReadyReceived = false;
 	
-		while (timeout < POWER_BUTTON_TIMEOUT) {
+		while (powerButtonnHeldTime < POWER_BUTTON_HOLD_TIME) {
+			// Wait to next check.
+			delay(POWER_BUTTON_DELAY);
 			
+			// Add delay to toggle time.
+			ledToggleTime += POWER_BUTTON_DELAY;
+	
 			// Toggle led after the set time.
-			if (ledToggleTime >= POWER_BUTTON_LED_BLINK_DELAY) {
+			if (ledToggleTime >= POWER_BUTTON_LED_BLINK_DELAY ||
+					(ctrlReadyReceived && ledToggleTime >= POWER_BUTTON_LED_FAST_BLINK_DELAY)) {
 				if (ledState) {
 					digitalWrite(POWER_BUTTON_LED_OUTPUT_PIN, POWER_BUTTON_LED_OFF);
 				} else {
@@ -95,24 +106,32 @@ void loop() {
 			}
 	
 			// Listen for ready signal.
-			if (isControlReday()) {
-				break;
+			if (isControlReady()) {
+				ctrlReadyTime += POWER_BUTTON_DELAY;
+				
+				// Set ready signal as recived when held for required time.
+				if (ctrlReadyTime >= POWER_CTRL_READY_HOLD_TIME) {
+					ctrlReadyReceived = true;
+
+					// Check if required time after accepted signal has passed.
+					if (ctrlReadyTime >= POWER_CTRL_READY_POST_TIME) {
+						break;
+					}
+				}
+			} else {
+				// Reset time and flag if not ready anymore.
+				ctrlReadyReceived = false;
+				ctrlReadyTime = 0;
 			}
 	
 			// If button is held for timeout then force shutdown.
 			if (digitalRead(POWER_BUTTON_INPUT_PIN) == POWER_BUTTON_DOWN) {
 				// Button is still pressed, add delay to counter.
-				timeout += POWER_BUTTON_DELAY;
+				powerButtonnHeldTime += POWER_BUTTON_DELAY;
 			} else {
 				// Button is released midpress, reset counter.
-				timeout = 0;
+				powerButtonnHeldTime = 0;
 			}
-			
-			// Add delay to toggle time.
-			ledToggleTime += POWER_BUTTON_DELAY;
-	
-			// Wait to next check.
-			delay(POWER_BUTTON_DELAY);
 		}
 		
 		// Turn off power.
@@ -130,7 +149,7 @@ void loop() {
 	}
 }
 
-static void waitForButtonState(uint_8 state) {
+static void waitForButtonState(uint8_t state) {
 
 	// Wait until button has requested state.
 	while(digitalRead(POWER_BUTTON_INPUT_PIN) != state) {}
@@ -139,8 +158,8 @@ static void waitForButtonState(uint_8 state) {
 	delay(POWER_BUTTON_DELAY);
 }
 
-static void isControlReady() {
-	return analogRead(POWER_CTRL_INPUT_PIN) >= POWER_CTRL_READY_THRESHOLD
+static bool isControlReady() {
+	return analogRead(POWER_CTRL_INPUT_PIN) < POWER_CTRL_READY_THRESHOLD;
 }
 
 static void enablePower(bool power) {
