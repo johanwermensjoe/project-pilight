@@ -18,7 +18,8 @@
 
 // Timings.
 #define POWER_BUTTON_HOLD_TIME (uint16_t) 3000
-#define POWER_BUTTON_DELAY (uint16_t) 100
+#define POWER_BUTTON_POLL_DELAY (uint16_t) 50
+#define POWER_BUTTON_DEBOUNCE_DELAY (uint16_t) 200
 #define POWER_BUTTON_LED_BLINK_DELAY (uint16_t) 500
 #define POWER_BUTTON_LED_FAST_BLINK_DELAY (uint16_t) 250
 #define POWER_CTRL_READY_HOLD_TIME (uint16_t) 2000
@@ -88,10 +89,10 @@ void loop() {
 	
 		while (powerButtonnHeldTime < POWER_BUTTON_HOLD_TIME) {
 			// Wait to next check.
-			delay(POWER_BUTTON_DELAY);
+			delay(POWER_BUTTON_POLL_DELAY);
 			
 			// Add delay to toggle time.
-			ledToggleTime += POWER_BUTTON_DELAY;
+			ledToggleTime += POWER_BUTTON_POLL_DELAY;
 	
 			// Toggle led after the set time.
 			if (ledToggleTime >= POWER_BUTTON_LED_BLINK_DELAY ||
@@ -107,7 +108,7 @@ void loop() {
 	
 			// Listen for ready signal.
 			if (isControlReady()) {
-				ctrlReadyTime += POWER_BUTTON_DELAY;
+				ctrlReadyTime += POWER_BUTTON_POLL_DELAY;
 				
 				// Set ready signal as recived when held for required time.
 				if (ctrlReadyTime >= POWER_CTRL_READY_HOLD_TIME) {
@@ -127,7 +128,7 @@ void loop() {
 			// If button is held for timeout then force shutdown.
 			if (digitalRead(POWER_BUTTON_INPUT_PIN) == POWER_BUTTON_DOWN) {
 				// Button is still pressed, add delay to counter.
-				powerButtonnHeldTime += POWER_BUTTON_DELAY;
+				powerButtonnHeldTime += POWER_BUTTON_POLL_DELAY;
 			} else {
 				// Button is released midpress, reset counter.
 				powerButtonnHeldTime = 0;
@@ -155,7 +156,7 @@ static void waitForButtonState(uint8_t state) {
 	while(digitalRead(POWER_BUTTON_INPUT_PIN) != state) {}
 
 	// Additional delay to avoid multiple toggles.
-	delay(POWER_BUTTON_DELAY);
+	delay(POWER_BUTTON_DEBOUNCE_DELAY);
 }
 
 static bool isControlReady() {
