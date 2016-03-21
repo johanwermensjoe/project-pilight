@@ -1,0 +1,242 @@
+#!/usr/bin/env python
+""" A LED layout rewriter (removes all comments in original file). """
+
+import json
+import re
+
+########################################################################
+## User settings
+CONFIG_FILENAME = "hyperion.config.json"
+
+## Each side of the TV (seen from the front) has the following fields:
+##  leds    : A list of led counts on each strip piece,
+##              matching the layout list.
+##  layout  : A list of lengths (in mm) of each strip piece.
+##  space   : A list of spaces (in mm) between strip pieces.
+##              First and last spaces are distance from corners (0 is ok).
+##              Should always have 1 element more than layout.
+LED_CONF = {
+    'left': {'leds': [11, 8], 'layout': [343, 248], 'space': [20, 20, 20]},
+    'right': {'leds': [11, 8], 'layout': [343, 248], 'space': [20, 20, 20]},
+    'top': {'leds': [34], 'layout': [1057], 'space': [20, 20]},
+    'bottom': {'leds': [2, 27, 2], 'layout': [62, 839, 62], \
+                'space': [25, 50, 50, 25]}
+    }
+
+## The amount of overlap.
+## Ex. 0.5 means the LED area will share 50% of its area with it's neighbors.
+OVERLAP = 0.5
+
+## The percentage of screenspace used for LEDS.
+## H_DEPTH is for vertical LEDs and V_DEPTH for horizontal LEDs.
+H_DEPTH = 0.03
+V_DEPTH = 0.02
+
+## The direction of the strip (seen from the front). 
+CLOCKWISE = True
+
+## What lower corner to start from. ('left', or 'right').
+START_CORNER = 'left'
+
+"""LED_CONF = {
+    'left': {'leds': [20], 'layout': [623], 'space': [10, 0]},
+    'right': {'leds': [20], 'layout': [623], 'space': [10, 10]},
+    'top': {'leds': [35], 'layout': [1090], 'space': [10, 10]},
+    'bottom': {'leds': [30], 'layout': [930], 'space': [85, 85]}
+    }
+
+## The amount of overlap.
+## Ex. 0.5 means the LED area will share 50% of its area with it's neighbors.
+OVERLAP = 0.5
+
+## The percentage of screenspace used for LEDS.
+## H_DEPTH is for vertical LEDs and V_DEPTH for horizontal LEDs.
+H_DEPTH = 0.03
+V_DEPTH = 0.02
+
+## The direction of the strip (seen from the front). 
+CLOCKWISE = False
+
+## What lower corner to start from. ('left', or 'right').
+START_CORNER = 'right'"""
+
+########################################################################
+## Constants (Only for program)
+REVERSE_CW = ['left', 'bottom']
+REVERSE_CCW = ['right', 'top']
+CLOCKWISE_ORDER = ['left', 'top', 'right', 'bottom']
+
+DEC_FORMAT = '{0:.4f}'
+
+## Functions
+def parse_json(filename):
+    """ Parse a JSON file
+        First remove comments and then use the json module package
+        Comments look like :
+            // ...
+        or
+            /*
+            ...
+            */
+    """
+    # Regular expression for comments
+    comment_re = re.compile(
+        r"""(^)?[^\S\n]*/(?:\*(.*?)\*/[^\S\n]*|/[^\n]*)($)?""",
+        re.DOTALL | re.MULTILINE
+    )
+
+    with open(filename) as file_:
+        content = ''.join(file_.readlines())
+
+        ## Looking for comments
+        match = comment_re.search(content)
+        while match:
+            # single line comment
+            content = content[:match.start()] + content[match.end():]
+            match = comment_re.search(content)
+
+        # Return json file
+        return json.loads(content)
+
+def get_led_coverage(led_side):
+    """ Returns the led coverage percentage for a given led side config. """
+    return float(sum(led_side['layout'])) / float(get_total_length(led_side))
+
+def get_total_length(led_side):
+    """ Returns the total leds + space length for a given led side config. """
+    return float(sum(led_side['layout'])) + float(sum(led_side['space']))
+
+def get_led_count(led_side):
+    """ Returns the led count for a given led side config. """
+    return float(sum(led_side['leds']))
+
+class Led(object):
+    """ Represents a LED. """
+    def __init__(self, min_hscan, max_hscan, min_vscan, max_vscan):
+        self.min_hscan = min_hscan
+        self.max_hscan = max_hscan
+        self.min_vscan = min_vscan
+        self.max_vscan = max_vscan
+
+## Main function.
+def write_led_config():
+    """ Main config writer function. """
+    # Read config file.
+    data = parse_json(CONFIG_FILENAME)
+
+    # Create an temporary LED config.
+    # LED ordering:
+    # Left / Right side -> top to bottom (0.0 - 1.0)
+    # Top / Bottom side -> left to right (0.0 - 1.0)
+    leds = {}
+
+    # Create LED specification.
+    leds['left'] = create_led_side_spec(LED_CONF['left'], \
+                                        True, hmax=V_DEPTH, hmin=0.0)
+    leds['right'] = create_led_side_spec(LED_CONF['right'], \
+                                        True, hmax=1.0, hmin=1.0 - V_DEPTH)
+    leds['top'] = create_led_side_spec(LED_CONF['top'], \
+                                        False, vmax=H_DEPTH, vmin=0.0)
+    leds['bottom'] = create_led_side_spec(LED_CONF['bottom'], \
+                                        False, vmax=1.0, vmin=1.0 - H_DEPTH)
+
+    # Reset LED data.
+    data['leds'] = []
+
+    # Set the side order.
+    if not CLOCKWISE:
+        CLOCKWISE_ORDER.reverse()
+
+    sidx = CLOCKWISE_ORDER.index(START_CORNER)
+    side_order = CLOCKWISE_ORDER[sidx:]
+    if sidx > 0:
+        side_order += CLOCKWISE_ORDER[:sidx]
+
+    # Place the LEDs in the correct order.
+    idx = 0
+    with open("leds.txt", 'w') as f:
+        f.write('\t"leds" :\n\t[\n')
+        for side in side_order:
+            # Reverse LEDs if needed.
+            leds_to_place = leds[side]
+            if (CLOCKWISE and side in REVERSE_CW) or \
+                (not CLOCKWISE and side in REVERSE_CCW):
+                leds_to_place.reverse()
+
+            # Index LEDs correctly.
+            for led in leds_to_place:
+                f.write('\t\t{\n')
+                f.write('\t\t\t"index" : ' + str(idx) + ',\n')
+                f.write('\t\t\t"hscan" : { "minimum" : ' + DEC_FORMAT.format(led.min_hscan) + \
+                                            ', "maximum" : ' + DEC_FORMAT.format(led.max_hscan) + ' },\n')
+                f.write('\t\t\t"vscan" : { "minimum" : ' + DEC_FORMAT.format(led.min_vscan) + \
+                                            ', "maximum" : ' + DEC_FORMAT.format(led.max_vscan) + ' }\n')
+                f.write('\t\t},\n')
+                if led.min_hscan >= led.max_hscan:
+                    print "error: " + str(idx)
+                if led.min_vscan >= led.max_vscan:
+                    print "error: " + str(idx)
+                data['leds'].append( \
+                    {'index': idx, \
+                    'hscan': {'minimum': DEC_FORMAT.format(led.min_hscan), \
+                                'maximum': DEC_FORMAT.format(led.max_hscan)}, \
+                    'vscan': {'minimum': DEC_FORMAT.format(led.min_vscan), \
+                                'maximum': DEC_FORMAT.format(led.max_vscan)}})
+                idx += 1
+        f.write('\t]')
+    # Overwrite old config with changes.
+#    with open(CONFIG_FILENAME, 'w') as out_file:
+#        json.dump(data, out_file, sort_keys=True, indent=0, separators=(',', ': '))
+
+def create_led_side_spec(led_side, vertical, \
+                        hmin=0.0, hmax=0.0, vmin=0.0, vmax=0.0):
+    """ Create a size specification for a led config side. """
+    # Create a LED list.
+    leds = []
+
+    # Initiate LED size and overlap.
+    led_size = get_led_coverage(led_side) / \
+                    get_led_count(led_side)
+
+    overlap = 0.5 * OVERLAP * led_size
+    curr_dist = 0.0
+
+    for idx, space in enumerate(led_side['space']):
+        # Add distance for space.
+        curr_dist += space / get_total_length(led_side)
+
+        if idx < len(led_side['leds']):
+            # Add LED.
+            for _ in range(led_side['leds'][idx]):
+                # Create a new LED specification.
+                led = Led(hmin, hmax, vmin, vmax)
+
+                if vertical:
+                    # Set start to 0.0 if it overflows.
+                    led.min_vscan = 0.0 if curr_dist - overlap < 0.0 else \
+                                    curr_dist - overlap
+
+                    # Set end to 1.0 if it overflows.
+                    led.max_vscan = 1.0 if curr_dist + led_size + \
+                                            overlap > 1.0 else \
+                                                curr_dist + led_size + overlap
+                else:
+                    # Set start to 0.0 if it overflows.
+                    led.min_hscan = 0.0 if curr_dist - overlap < 0.0 else \
+                                    curr_dist - overlap
+
+                    # Set end to 1.0 if it overflows.
+                    led.max_hscan = 1.0 if curr_dist + led_size + \
+                                            overlap > 1.0 else \
+                                                curr_dist + led_size + overlap
+
+                # Add LED to array.
+                leds.append(led)
+
+                # Increase current distance one LED size.
+                curr_dist += led_size
+
+    return leds
+
+## Run script!
+write_led_config()
