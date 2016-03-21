@@ -1,0 +1,8 @@
+#!/bin/sh -e
+
+if [ $1 != "" ]; then
+    scp hyperion.config.json pi@$1:hyperion.config.json
+    ssh pi@$1 "sudo cp hyperion.config.json /opt/hyperion/config/hyperion.config.json; sudo service hyperion restart"
+else
+    echo "Please provide server IP as a argument."
+fi    
