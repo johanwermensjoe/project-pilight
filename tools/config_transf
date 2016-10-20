@@ -3,6 +3,7 @@
 if [ $1 != "" ]; then
     scp hyperion.config.json pi@$1:hyperion.config.json
     ssh pi@$1 "sudo cp hyperion.config.json /opt/hyperion/config/hyperion.config.json; sudo service hyperion restart"
+    ssh pi@$1 "rm hyperion.config.json"
 else
     echo "Please provide server IP as a argument."
 fi    
