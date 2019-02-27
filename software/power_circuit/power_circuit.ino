@@ -10,11 +10,11 @@
 //#define AUTO_ON
 
 // Ports.
-#define POWER_CTRL_INPUT_PIN (uint8_t) 1 // Analog pin number (digital pin 2)
-#define POWER_CTRL_OUTPUT_PIN (uint8_t) 1
-#define POWER_BUTTON_LED_OUTPUT_PIN (uint8_t) 0
-#define POWER_SWITCH_OUTPUT_PIN (uint8_t) 4
-#define POWER_BUTTON_INPUT_PIN (uint8_t) 3
+#define POWER_CTRL_INPUT_PIN (uint8_t) 3 // Analog pin number (digital pin 3)
+#define POWER_CTRL_OUTPUT_PIN (uint8_t) 4
+#define POWER_BUTTON_LED_OUTPUT_PIN (uint8_t) 2
+#define POWER_SWITCH_OUTPUT_PIN (uint8_t) 0
+#define POWER_BUTTON_INPUT_PIN (uint8_t) 1
 
 // Timings.
 #define POWER_BUTTON_HOLD_TIME (uint16_t) 3000
