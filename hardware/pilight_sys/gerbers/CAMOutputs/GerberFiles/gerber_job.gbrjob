@@ -1,0 +1,24 @@
+{
+    "Header": {
+        "Comment": "All values are metric (mm)",
+        "CreationDate": "2019-02-28T20:13:12Z",
+        "GenerationSoftware": {
+            "Application": "EAGLE",
+            "Vendor": "Autodesk",
+            "Version": "9.3.1"
+        },
+        "Part": "Single"
+    },
+    "Overall": {
+        "BoardThickness": 1.57,
+        "LayerNumber": 2,
+        "Name": {
+            "ProjectId": "pilight_sys"
+        },
+        "Owner": "Johan Wermensja <johanwermensjoe@gmail.com>",
+        "Size": {
+            "X": 71.1,
+            "Y": 43.6
+        }
+    }
+}
