@@ -15,6 +15,7 @@ CONFIG_FILENAME = "hyperion.config.json"
 ##  space   : A list of spaces (in mm) between strip pieces.
 ##              First and last spaces are distance from corners (0 is ok).
 ##              Should always have 1 element more than layout.
+"""
 LED_CONF = {
     'left': {'leds': [11, 8], 'layout': [343, 248], 'space': [20, 20, 20]},
     'right': {'leds': [11, 8], 'layout': [343, 248], 'space': [20, 20, 20]},
@@ -37,12 +38,13 @@ CLOCKWISE = True
 
 ## What lower corner to start from. ('left', or 'right').
 START_CORNER = 'left'
+"""
 
-"""LED_CONF = {
-    'left': {'leds': [20], 'layout': [623], 'space': [10, 0]},
-    'right': {'leds': [20], 'layout': [623], 'space': [10, 10]},
-    'top': {'leds': [35], 'layout': [1090], 'space': [10, 10]},
-    'bottom': {'leds': [30], 'layout': [930], 'space': [85, 85]}
+LED_CONF = {
+    'left': {'leds': [25], 'layout': [775], 'space': [10, 0]},
+    'right': {'leds': [25], 'layout': [775], 'space': [10, 10]},
+    'top': {'leds': [45], 'layout': [1400], 'space': [10, 10]},
+    #'bottom': {'leds': [30], 'layout': [930], 'space': [85, 85]}
     }
 
 ## The amount of overlap.
@@ -58,7 +60,7 @@ V_DEPTH = 0.02
 CLOCKWISE = False
 
 ## What lower corner to start from. ('left', or 'right').
-START_CORNER = 'right'"""
+START_CORNER = 'right'
 
 ########################################################################
 ## Constants (Only for program)
@@ -132,13 +134,17 @@ def write_led_config():
 
     # Create LED specification.
     leds['left'] = create_led_side_spec(LED_CONF['left'], \
-                                        True, hmax=V_DEPTH, hmin=0.0)
+                                        True, hmax=V_DEPTH, hmin=0.0) \
+                                        if 'left' in LED_CONF else []
     leds['right'] = create_led_side_spec(LED_CONF['right'], \
-                                        True, hmax=1.0, hmin=1.0 - V_DEPTH)
+                                        True, hmax=1.0, hmin=1.0 - V_DEPTH) \
+                                        if 'right' in LED_CONF else []
     leds['top'] = create_led_side_spec(LED_CONF['top'], \
-                                        False, vmax=H_DEPTH, vmin=0.0)
+                                        False, vmax=H_DEPTH, vmin=0.0) \
+                                        if 'top' in LED_CONF else []
     leds['bottom'] = create_led_side_spec(LED_CONF['bottom'], \
-                                        False, vmax=1.0, vmin=1.0 - H_DEPTH)
+                                        False, vmax=1.0, vmin=1.0 - H_DEPTH) \
+                                         if 'bottom' in LED_CONF else []
 
     # Reset LED data.
     data['leds'] = []
@@ -173,20 +179,20 @@ def write_led_config():
                                             ', "maximum" : ' + DEC_FORMAT.format(led.max_vscan) + ' }\n')
                 f.write('\t\t},\n')
                 if led.min_hscan >= led.max_hscan:
-                    print "error: " + str(idx)
+                    print("error: " + str(idx))
                 if led.min_vscan >= led.max_vscan:
-                    print "error: " + str(idx)
+                    print("error: " + str(idx))
                 data['leds'].append( \
                     {'index': idx, \
-                    'hscan': {'minimum': DEC_FORMAT.format(led.min_hscan), \
-                                'maximum': DEC_FORMAT.format(led.max_hscan)}, \
-                    'vscan': {'minimum': DEC_FORMAT.format(led.min_vscan), \
-                                'maximum': DEC_FORMAT.format(led.max_vscan)}})
+                    'hscan': {'minimum': float(DEC_FORMAT.format(led.min_hscan)), \
+                                'maximum': float(DEC_FORMAT.format(led.max_hscan))}, \
+                    'vscan': {'minimum': float(DEC_FORMAT.format(led.min_vscan)), \
+                                'maximum': float(DEC_FORMAT.format(led.max_vscan))}})
                 idx += 1
         f.write('\t]')
     # Overwrite old config with changes.
-#    with open(CONFIG_FILENAME, 'w') as out_file:
-#        json.dump(data, out_file, sort_keys=True, indent=0, separators=(',', ': '))
+    with open(CONFIG_FILENAME, 'w') as out_file:
+        json.dump(data, out_file, sort_keys=True, indent=4, separators=(',', ': '))
 
 def create_led_side_spec(led_side, vertical, \
                         hmin=0.0, hmax=0.0, vmin=0.0, vmax=0.0):
