@@ -41,10 +41,10 @@ START_CORNER = 'left'
 """
 
 LED_CONF = {
-    'left': {'leds': [25], 'layout': [775], 'space': [10, 0]},
-    'right': {'leds': [25], 'layout': [775], 'space': [10, 10]},
+    'left': {'leds': [25], 'layout': [775], 'space': [10, 30]},
+    'right': {'leds': [25], 'layout': [775], 'space': [10, 30]},
     'top': {'leds': [45], 'layout': [1400], 'space': [10, 10]},
-    #'bottom': {'leds': [30], 'layout': [930], 'space': [85, 85]}
+    'bottom': {'leds': [21, 21], 'layout': [640, 640], 'space': [20, 100, 20]}
     }
 
 ## The amount of overlap.
@@ -59,8 +59,9 @@ V_DEPTH = 0.02
 ## The direction of the strip (seen from the front). 
 CLOCKWISE = False
 
-## What lower corner to start from. ('left', or 'right').
-START_CORNER = 'right'
+## What lower corner to start from.
+START_CORNER = 'bottom'
+START_OFFSET = 21
 
 ########################################################################
 ## Constants (Only for program)
@@ -159,7 +160,8 @@ def write_led_config():
         side_order += CLOCKWISE_ORDER[:sidx]
 
     # Place the LEDs in the correct order.
-    idx = 0
+    led_count = sum([len(x) for x in leds.values()])
+    idx = led_count - START_OFFSET
     with open("leds.txt", 'w') as f:
         f.write('\t"leds" :\n\t[\n')
         for side in side_order:
@@ -172,18 +174,18 @@ def write_led_config():
             # Index LEDs correctly.
             for led in leds_to_place:
                 f.write('\t\t{\n')
-                f.write('\t\t\t"index" : ' + str(idx) + ',\n')
+                f.write('\t\t\t"index" : ' + str(idx % led_count) + ',\n')
                 f.write('\t\t\t"hscan" : { "minimum" : ' + DEC_FORMAT.format(led.min_hscan) + \
                                             ', "maximum" : ' + DEC_FORMAT.format(led.max_hscan) + ' },\n')
                 f.write('\t\t\t"vscan" : { "minimum" : ' + DEC_FORMAT.format(led.min_vscan) + \
                                             ', "maximum" : ' + DEC_FORMAT.format(led.max_vscan) + ' }\n')
                 f.write('\t\t},\n')
                 if led.min_hscan >= led.max_hscan:
-                    print("error: " + str(idx))
+                    print("error: " + str(idx % led_count))
                 if led.min_vscan >= led.max_vscan:
-                    print("error: " + str(idx))
+                    print("error: " + str(idx % led_count))
                 data['leds'].append( \
-                    {'index': idx, \
+                    {'index': idx % led_count, \
                     'hscan': {'minimum': float(DEC_FORMAT.format(led.min_hscan)), \
                                 'maximum': float(DEC_FORMAT.format(led.max_hscan))}, \
                     'vscan': {'minimum': float(DEC_FORMAT.format(led.min_vscan)), \
